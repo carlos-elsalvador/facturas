@@ -6,19 +6,8 @@ import re
 import os
 import glob
 import pandas as pd
-
-# Ruta base donde están organizadas las facturas
-ruta_base = "/home/carlos/workbenchPython/facturas/datos"
-
-def procesar_linea(linea):
-    """ Extrae cantidad, descripción y precio de una línea de texto. """
-    match = re.match(r"(\d+)\s+([A-ZÑÁÉÍÓÚa-zñáéíóú\s\/-]+)\s+(\d+,\d+)?", linea)
-    if match:
-        cantidad = int(match.group(1))
-        descripcion = match.group(2).strip()
-        precio = float(match.group(3).replace(",", ".")) if match.group(3) else None
-        return cantidad, descripcion, precio
-    return None, None, None
+from datetime import datetime
+from my_mysql  import * # Importamos nuestro archivo de gestión de MySQL
 
 def extraer_texto(imagenes):
     """ Extrae texto de una lista de imágenes usando OCR """
@@ -45,56 +34,110 @@ def extraer_metadatos(texto):
     establecimiento = establecimiento_match.group(0) if establecimiento_match else "Desconocido"
     total_pagar = float(total_match.group(1).replace(",", ".")) if total_match else 0.0
 
+    # **CORRECCIÓN** Convierte la fecha al formato correcto antes de retornar
+    if fecha != "Desconocida":
+        try:
+            fecha = datetime.strptime(fecha, "%d/%m/%Y").strftime("%Y-%m-%d")
+        except ValueError:
+            fecha = "Fecha Inválida"    
+
     return fecha, establecimiento, total_pagar
 
-# Almacenar productos de todas las facturas
-facturas_procesadas = []
+def procesar_linea(linea):
+    """ Extrae cantidad, descripción y precio de una línea de texto """
+    match = re.match(r"(\d+)\s+([A-ZÑÁÉÍÓÚa-zñáéíóú\s\/-]+)\s+(\d+,\d+)?", linea)
+    
+    if match:
+        cantidad = int(match.group(1))
+        descripcion = match.group(2).strip()
+        precio = float(match.group(3).replace(",", ".")) if match.group(3) else None
+        return cantidad, descripcion, precio
+    
+    return None, None, None
 
-for año in os.listdir(ruta_base):
-    ruta_año = os.path.join(ruta_base, año)
-    if os.path.isdir(ruta_año):
-        for mes in os.listdir(ruta_año):
-            ruta_mes = os.path.join(ruta_año, mes)
+def listar_facturas():
+    """Lista todas las facturas en las carpetas organizadas por año y mes"""
+    facturas_en_carpetas = []
+    
+    for año in os.listdir(ruta_base):
+        ruta_año = os.path.join(ruta_base, año)
+        if os.path.isdir(ruta_año):
+            for mes in os.listdir(ruta_año):
+                ruta_mes = os.path.join(ruta_año, mes)
+                facturas = glob.glob(os.path.join(ruta_mes, "MERCADONA_*.pdf"))  
 
-            # Filtrar solo facturas cuyo nombre inicia con "MERCADONA"
-            facturas = glob.glob(os.path.join(ruta_mes, "MERCADONA_*.pdf"))
-            print(f"📂 Procesando {len(facturas)} facturas de MERCADONA en {mes} {año}")
+                for factura in facturas:
+                    fecha_factura = re.search(r"(\d{4})(\d{2})(\d{2})", factura)  # Extraer fecha del nombre del archivo
+                    if fecha_factura:
+                        facturas_en_carpetas.append((factura, fecha_factura.group(0)))
 
-            for factura in facturas:
-                print(f"🔍 Procesando factura: {factura}")
-                imagenes = convert_from_path(factura)
-                texto_extraido, precios_extraidos = extraer_texto(imagenes)
-                fecha, establecimiento, total_pagar = extraer_metadatos(texto_extraido)
+    return facturas_en_carpetas
 
-                productos_extraidos = []
-                lineas = texto_extraido.split("\n")
+def convertir_fecha(fecha_str):
+    """ Convierte una fecha en formato DD/MM/YYYY a YYYY-MM-DD """
+    try:
+        fecha_mysql = datetime.strptime(fecha_str, "%d/%m/%Y").strftime("%Y-%m-%d")
+        return fecha_mysql
+    except ValueError:
+        return None  # Manejo de errores si la fecha no es válida
 
-                for j, linea in enumerate(lineas):
-                    cantidad, descripcion, precio = procesar_linea(linea)
 
-                    if cantidad and descripcion:
-                        if j < len(precios_extraidos):
-                            precio = float(precios_extraidos[j].replace(",", "."))
-                        productos_extraidos.append({
-                            "cantidad": cantidad, 
-                            "descripcion": descripcion, 
-                            "precio": precio, 
-                            "fecha": fecha, 
-                            "establecimiento": establecimiento, 
-                            "total_pagar": total_pagar
-                        })                        
-                
-                # Agregar datos a cada factura procesada
-                facturas_procesadas.extend(productos_extraidos)
+def procesar_facturas(facturas_a_procesar):
+    if not facturas_a_procesar:
+        print("✅ No hay facturas nuevas por procesar.")
+        return
 
-                # Agregar los nuevos campos a la factura
-                for producto in productos_extraidos:
-                    producto["articulos_detectados"] = len(productos_extraidos)
-                    producto["precios_detectados"] = sum(1 for p in productos_extraidos if p["precio"] is not None)
+    facturas_procesadas = []
+    
+    for factura in facturas_a_procesar:
+        imagenes = convert_from_path(factura)
+        texto_extraido, precios_extraidos = extraer_texto(imagenes)
+        fecha, establecimiento, total_pagar = extraer_metadatos(texto_extraido)
+        
+        productos_extraidos = []
+        for j, linea in enumerate(texto_extraido.split("\n")):
+            cantidad, descripcion, precio = procesar_linea(linea)
+            if cantidad and descripcion:
+                if j < len(precios_extraidos):
+                    precio = float(precios_extraidos[j].replace(",", "."))
+                productos_extraidos.append({
+                    "cantidad": cantidad, "descripcion": descripcion, "precio": precio,
+                    "fecha": fecha, "establecimiento": establecimiento, "total_pagar": total_pagar,
+                    "articulos_detectados": len(productos_extraidos),
+                    "precios_detectados": sum(1 for p in productos_extraidos if p["precio"] is not None)
+                })
 
-# Crear DataFrame y guardar en CSV
-df_facturas = pd.DataFrame(facturas_procesadas)
-df_facturas.to_csv("facturas_supermercado.csv", index=False, encoding="utf-8")
+        facturas_procesadas.extend(productos_extraidos)
+        return facturas_procesadas
 
-print("📂 Archivo CSV generado: facturas_supermercado.csv")
-print(df_facturas.head())
+
+if __name__ == "__main__":
+    # Ruta base donde están organizadas las facturas
+    ruta_base = "/home/carlos/workbenchPython/facturas/datos"
+
+    # Procesa solo las facturas nuevas, evitando reprocesar las ya registradas
+    # ultima_fecha_db = obtener_ultima_fecha()
+    ultima_fecha_db = datetime.strptime('2025-05-01', "%Y-%m-%d")    
+    # Se leen todas las carpetas
+    facturas_en_carpetas = listar_facturas()
+    # Se filtran las que no estan procesadas
+    facturas_a_procesar = [f[0] for f in facturas_en_carpetas if datetime.strptime(f[1], "%Y%m%d") > ultima_fecha_db]  
+    # Se procesan las que no estan procesadas
+    facturas_procesadas=procesar_facturas(facturas_a_procesar)
+    #Se presentan resultados preliminares
+    print('--***--')    
+    print(f"✅ {len(facturas_a_procesar)} nuevas facturas seran agregadas a la base de datos.")
+    print(f"✅ {len(facturas_procesadas)} nuevos articulos seran agregados a la base de datos.")
+    print('--***--')
+    # print(facturas_procesadas)
+    # exit()
+
+#BD
+    """Crear la base de datos y la tabla 'facturas' si no existen"""
+    conn, cursor = conectar_db()
+    if conn is None or cursor is None:
+        print('❌ Error de conexión con MySQL. No se pudo conectar a la BD. Se procede a crear BD')
+    else:
+        print("✅ Conectado correctamente a MySQL")
+        crear_base_datos()
+    guardar_en_db(facturas_procesadas)
