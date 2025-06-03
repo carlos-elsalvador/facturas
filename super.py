@@ -73,15 +73,6 @@ def listar_facturas():
 
     return facturas_en_carpetas
 
-def convertir_fecha(fecha_str):
-    """ Convierte una fecha en formato DD/MM/YYYY a YYYY-MM-DD """
-    try:
-        fecha_mysql = datetime.strptime(fecha_str, "%d/%m/%Y").strftime("%Y-%m-%d")
-        return fecha_mysql
-    except ValueError:
-        return None  # Manejo de errores si la fecha no es válida
-
-
 def procesar_facturas(facturas_a_procesar):
     if not facturas_a_procesar:
         print("✅ No hay facturas nuevas por procesar.")
@@ -132,12 +123,14 @@ if __name__ == "__main__":
     # print(facturas_procesadas)
     # exit()
 
-#BD
-    """Crear la base de datos y la tabla 'facturas' si no existen"""
+#BD. Crear la base de datos y la tabla 'facturas' si no existen
     conn, cursor = conectar_db()
     if conn is None or cursor is None:
-        print('❌ Error de conexión con MySQL. No se pudo conectar a la BD. Se procede a crear BD')
+        print('❌ Error de conexión con MySQL. No se pudo conectar a la BD.')
+        crear_db()
+        print("✅ Se ha creado BD MySQL")
+        guardar_en_db(facturas_procesadas)
+        print("✅ Se han guardado los registros en la BD")
     else:
-        print("✅ Conectado correctamente a MySQL")
-        crear_base_datos()
-    guardar_en_db(facturas_procesadas)
+        guardar_en_db(facturas_procesadas)
+        print("✅ Se ha actualizado la BD")

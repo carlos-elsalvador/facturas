@@ -16,31 +16,47 @@ def conectar_db():
         return None, None  # Si la conexión falla, devolver None
 
 
-def crear_base_datos():
+def crear_db():
     """Crear la base de datos y la tabla 'facturas' si no existen"""
-    conn, cursor = conectar_db()
-    if conn is None or cursor is None:
-        return "Error: No se pudo conectar a la base de datos."
+    conn = mysql.connector.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
+    cursor = conn.cursor()
 
-    cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_NAME}")
-    cursor.execute(f"USE {DB_NAME}")
+    try:
+        # Verificar si la base de datos ya existe
+        cursor.execute("SHOW DATABASES")
+        bases_existentes = [db[0] for db in cursor.fetchall()]
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS facturas (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            cantidad INT,
-            descripcion TEXT,
-            precio FLOAT,
-            fecha DATE,
-            establecimiento VARCHAR(100),
-            total_pagar FLOAT,
-            articulos_detectados INT,
-            precios_detectados INT
-        )
-    """)
+        if DB_NAME not in bases_existentes:
+            cursor.execute(f"CREATE DATABASE {DB_NAME}")
 
-    conn.commit()
-    conn.close()
+        cursor.execute(f"USE {DB_NAME}")
+
+        # Crear la tabla 'facturas' si no existe (con unicidad, UNIQUE)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS facturas (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                cantidad INT,
+                descripcion TEXT,
+                precio FLOAT,
+                fecha DATE,
+                establecimiento VARCHAR(100),
+                total_pagar FLOAT,
+                articulos_detectados INT,
+                precios_detectados INT
+            )
+        """)
+
+        conn.commit()
+        print("Base de datos y tabla 'facturas' verificadas correctamente.")
+    
+    except mysql.connector.Error as err:
+        print(f"[Error de MySQL] {err}")
+    except Exception as e:
+        print(f"[Error inesperado] {e}")
+    finally:
+        conn.close()  # Asegurar el cierre de conexión para evitar fugas de recursos
+
+
 
 def guardar_en_db(facturas):
     """ Guarda los datos procesados en la base de datos MySQL """
@@ -53,6 +69,19 @@ def guardar_en_db(facturas):
             INSERT INTO facturas (cantidad, descripcion, precio, fecha, establecimiento, total_pagar, articulos_detectados, precios_detectados)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (factura["cantidad"], factura["descripcion"], factura["precio"], factura["fecha"], factura["establecimiento"], factura["total_pagar"], factura["articulos_detectados"], factura["precios_detectados"]))
+
+    # for factura in facturas:
+    #     # Verificar si el registro ya existe basado en la fecha y descripción (ajustar según criterio de unicidad)
+    #     cursor.execute("""
+    #         SELECT COUNT(*) FROM facturas 
+    #         WHERE fecha = %s AND descripcion = %s AND precio = %s
+    #     """, (factura["fecha"], factura["descripcion"], factura["precio"]))
+
+    #     if cursor.fetchone()[0] == 0:  # Solo insertar si no existe
+    #         cursor.execute("""
+    #             INSERT INTO facturas (cantidad, descripcion, precio, fecha, establecimiento, total_pagar, articulos_detectados, precios_detectados)
+    #             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    #         """, (factura["cantidad"], factura["descripcion"], factura["precio"], factura["fecha"], factura["establecimiento"], factura["total_pagar"], factura["articulos_detectados"], factura["precios_detectados"]))
 
     conn.commit()
     conn.close()
