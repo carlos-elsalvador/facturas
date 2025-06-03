@@ -42,7 +42,8 @@ def crear_db():
                 establecimiento VARCHAR(100),
                 total_pagar FLOAT,
                 articulos_detectados INT,
-                precios_detectados INT
+                precios_detectados INT,
+                UNIQUE KEY unique_factura (fecha, establecimiento, descripcion(255), total_pagar)                       
             )
         """)
 
@@ -66,7 +67,7 @@ def guardar_en_db(facturas):
 
     for factura in facturas:
         cursor.execute("""
-            INSERT INTO facturas (cantidad, descripcion, precio, fecha, establecimiento, total_pagar, articulos_detectados, precios_detectados)
+            INSERT IGNORE INTO facturas (cantidad, descripcion, precio, fecha, establecimiento, total_pagar, articulos_detectados, precios_detectados)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (factura["cantidad"], factura["descripcion"], factura["precio"], factura["fecha"], factura["establecimiento"], factura["total_pagar"], factura["articulos_detectados"], factura["precios_detectados"]))
 
