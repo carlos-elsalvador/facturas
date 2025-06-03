@@ -99,7 +99,7 @@ def procesar_facturas(facturas_a_procesar):
                 })
 
         facturas_procesadas.extend(productos_extraidos)
-        return facturas_procesadas
+    return facturas_procesadas
 
 
 if __name__ == "__main__":
@@ -108,29 +108,24 @@ if __name__ == "__main__":
 
     # Procesa solo las facturas nuevas, evitando reprocesar las ya registradas
     # ultima_fecha_db = obtener_ultima_fecha()
-    ultima_fecha_db = datetime.strptime('2025-05-01', "%Y-%m-%d")    
+    ultima_fecha_db = datetime.strptime('2025-01-01', "%Y-%m-%d")    
     # Se leen todas las carpetas
     facturas_en_carpetas = listar_facturas()
     # Se filtran las que no estan procesadas
     facturas_a_procesar = [f[0] for f in facturas_en_carpetas if datetime.strptime(f[1], "%Y%m%d") > ultima_fecha_db]  
+    #
+    if facturas_a_procesar:
     # Se procesan las que no estan procesadas
-    facturas_procesadas=procesar_facturas(facturas_a_procesar)
-    #Se presentan resultados preliminares
-    print('--***--')    
-    print(f"✅ {len(facturas_a_procesar)} nuevas facturas seran agregadas a la base de datos.")
-    print(f"✅ {len(facturas_procesadas)} nuevos articulos seran agregados a la base de datos.")
-    print('--***--')
-    # print(facturas_procesadas)
-    # exit()
-
-#BD. Crear la base de datos y la tabla 'facturas' si no existen
-    conn, cursor = conectar_db()
-    if conn is None or cursor is None:
-        print('❌ Error de conexión con MySQL. No se pudo conectar a la BD.')
-        crear_db()
-        print("✅ Se ha creado BD MySQL")
+        facturas_procesadas=procesar_facturas(facturas_a_procesar)
+    #BD. Crear la base de datos y la tabla 'facturas' si no existen
+        conn, cursor = conectar_db()
+        if conn is None or cursor is None:
+            print('❌ Error de conexión con MySQL. No se pudo conectar a la BD.')
+            crear_db()
+            print("✅ Se ha creado BD MySQL")
         guardar_en_db(facturas_procesadas)
-        print("✅ Se han guardado los registros en la BD")
-    else:
-        guardar_en_db(facturas_procesadas)
+        print('--***--')            
         print("✅ Se ha actualizado la BD")
+        print(f"✅ {len(facturas_a_procesar)} nuevas facturas fueron agregadas.")
+        print(f"✅ {len(facturas_procesadas)} nuevos articulos fueron agregados.")
+        # print(facturas_a_procesar)
