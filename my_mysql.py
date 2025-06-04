@@ -71,19 +71,6 @@ def guardar_en_db(facturas):
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (factura["cantidad"], factura["descripcion"], factura["precio"], factura["fecha"], factura["establecimiento"], factura["total_pagar"], factura["articulos_detectados"], factura["precios_detectados"]))
 
-    # for factura in facturas:
-    #     # Verificar si el registro ya existe basado en la fecha y descripción (ajustar según criterio de unicidad)
-    #     cursor.execute("""
-    #         SELECT COUNT(*) FROM facturas 
-    #         WHERE fecha = %s AND descripcion = %s AND precio = %s
-    #     """, (factura["fecha"], factura["descripcion"], factura["precio"]))
-
-    #     if cursor.fetchone()[0] == 0:  # Solo insertar si no existe
-    #         cursor.execute("""
-    #             INSERT INTO facturas (cantidad, descripcion, precio, fecha, establecimiento, total_pagar, articulos_detectados, precios_detectados)
-    #             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    #         """, (factura["cantidad"], factura["descripcion"], factura["precio"], factura["fecha"], factura["establecimiento"], factura["total_pagar"], factura["articulos_detectados"], factura["precios_detectados"]))
-
     conn.commit()
     conn.close()
 
@@ -96,7 +83,8 @@ def obtener_ultima_fecha():
         return "Error: La base de datos no existe."
 
     # Verificar si la tabla facturas existe
-    cursor.execute("SELECT name FROM {DB_NAME} WHERE type='table' AND name='facturas'")
+    cursor.execute("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'facturas'")
+
     if not cursor.fetchone():
         conn.close()
         return "Error: La tabla 'facturas' no existe en la base de datos."

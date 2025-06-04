@@ -81,10 +81,19 @@ def procesar_facturas(facturas_a_procesar):
     facturas_procesadas = []
     
     for factura in facturas_a_procesar:
-        imagenes = convert_from_path(factura)
+        imagenes = convert_from_path(factura[0])
         texto_extraido, precios_extraidos = extraer_texto(imagenes)
         fecha, establecimiento, total_pagar = extraer_metadatos(texto_extraido)
-        
+
+        #Analizar fecha por separado.   Convertimos el objeto a string
+        fecha_factura = datetime.strptime(factura[1], "%Y%m%d").strftime("%Y-%m-%d")
+
+        if fecha == "Desconocida":
+            fecha = "Desconocida"
+        elif fecha != fecha_factura:
+            fecha = "Error"
+        print(fecha, fecha_factura, fecha == fecha_factura)  # Para depuración
+
         productos_extraidos = []
         for j, linea in enumerate(texto_extraido.split("\n")):
             cantidad, descripcion, precio = procesar_linea(linea)
@@ -107,12 +116,12 @@ if __name__ == "__main__":
     ruta_base = "/home/carlos/workbenchPython/facturas/datos"
 
     # Procesa solo las facturas nuevas, evitando reprocesar las ya registradas
-    # ultima_fecha_db = obtener_ultima_fecha()
-    ultima_fecha_db = datetime.strptime('2025-01-01', "%Y-%m-%d")    
+    ultima_fecha_db = obtener_ultima_fecha()   
+    # ultima_fecha_db = datetime.strptime('2025-01-01', "%Y-%m-%d").date()
     # Se leen todas las carpetas
     facturas_en_carpetas = listar_facturas()
     # Se filtran las que no estan procesadas
-    facturas_a_procesar = [f[0] for f in facturas_en_carpetas if datetime.strptime(f[1], "%Y%m%d") > ultima_fecha_db]  
+    facturas_a_procesar = [f for f in facturas_en_carpetas if datetime.strptime(f[1], "%Y%m%d").date() > ultima_fecha_db]
     #
     if facturas_a_procesar:
     # Se procesan las que no estan procesadas
